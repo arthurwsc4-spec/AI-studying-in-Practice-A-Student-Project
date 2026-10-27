@@ -7,6 +7,7 @@ from groq import Groq
 import pyttsx3
 from tkinter import Tk, filedialog
 from dotenv import load_dotenv
+import json
 
 load_dotenv()
 api_key = os.getenv("API_KEY")
@@ -59,6 +60,13 @@ dimension = embeddings.shape[1]
 index = faiss.IndexFlatL2(dimension)
 index.add(embeddings.astype("float32"))
 
+#Saving knowledge
+def saving_knowledge(path, chunks, embeddings, metadata):
+    records = []
+    for text, vector in zip(chunks, embeddings):
+        records.append({"text": text, "embeddings": vector.todolist()})
+    data = {"metadata": metadata, "records": records}
+
 #Context
 def search_context(question, amount=5): 
     embedding_pergunta = embeddings_model.encode([question], convert_to_numpy=True)
@@ -90,5 +98,5 @@ def AI_speaking(AI_answer):
     ai.stop()
 
 print("Initializing audio test.")
-AI_speaking("My name is Arthur and I'm the one who made this project.")
+AI_speaking("Fala isso aqui Giu.")
 print("Audio test finalized.")
