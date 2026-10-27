@@ -6,14 +6,12 @@ import numpy as np
 from groq import Groq
 import pyttsx3
 from tkinter import Tk, filedialog
+from dotenv import load_dotenv
 
-api_key = os.getenv("GROQ_API_KEY")
-
-print("Chave encontrada no main.py:", bool(api_key))
-
+load_dotenv()
+api_key = os.getenv("API_KEY")
 if not api_key:
-    raise ValueError("GROQ_API_KEY não foi encontrada neste processo.")
-
+    raise ValueError("API_KEY couldn't be found at .env file.")
 client = Groq(api_key=api_key)
 AI_model = "openai/gpt-oss-120b"
 Temperature = 0.5
@@ -27,11 +25,18 @@ with open("AI_Persona.txt", "r", encoding="utf-8") as content:
 #reading data base
 root = Tk()
 root.withdraw()
-file_path = filedialog.askopenfilename(title="Select the file you want to upload.")
-#doing
+file_path = filedialog.askopenfilename(title="Select the file you want to upload.", filetypes=[("Text files", "*.txt")])
+root.destroy()
+if not file_path:
+    print("No file selected or found.")
+    exit()
+with open(file_path, "r", encoding="utf-8") as data:
+    data_base = data.read()
+print("Database successfully loaded!")
+
 
 # Chunks
-def creating_chunks(text, size=1000, overlay=250):
+def creating_chunks(text, size=1000, overlay=300):
     chunks = []
     start = 0
     while start < len(text):
@@ -84,6 +89,6 @@ def AI_speaking(AI_answer):
     ai.runAndWait()
     ai.stop()
 
-print("iniciando teste de audio")
-AI_speaking("Meu nome é Arthur, e eu que fiz esse projeto.")
-print("teste de audio finalizado")
+print("Initializing audio test.")
+AI_speaking("My name is Arthur and I'm the one who made this project.")
+print("Audio test finalized.")
