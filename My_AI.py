@@ -46,6 +46,38 @@ print("Database successfully loaded!")
 data_hash = hashlib.sha256(data_base.encode("utf-8")).hexdigest()
 embeddings_model_name = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 
+# Cheking storage for info
+def check_storage():
+    files_exist = (chunks_path.exists() and embeddings_path.exists() and index_path.exists( ) and metadata_path.exists())
+    if not files_exist:
+        return False
+
+    with open(metadata_path, "r", encoding="utf-8") as file:
+        metadata = json.load(file)
+    if metadata["data_hash"] != data_hash:
+        return False
+    if metadata["embeddings_model"] != embeddings_model_name:  #making sure that the model is the same
+        return False
+
+    return True
+
+# Saving the knowledge
+def save_knowledge(chunks, embeddings, index):
+    with open(chunks_path, "wb") as file:
+        pickle.dump(chunks, file)
+
+    np.save(embeddings_path, embeddings)
+
+    faiss.write_index(index, str(index_path))
+
+    metadata = {
+        "data_hash": data_hash,
+        "embeddings_model": embeddings_model_name
+    }
+    with open(metadata_path, "w", encoding="utf-8") as file:
+        json.dump(metadata, file, indent=4)
+
+    print("Knowledge successfully saved!")
 
 # Chunks
 def creating_chunks(text, size=1000, overlay=300):
@@ -70,13 +102,6 @@ embeddings = creating_embeddings(chunks)
 dimension = embeddings.shape[1]
 index = faiss.IndexFlatL2(dimension)
 index.add(embeddings.astype("float32"))
-
-#Saving knowledge
-def saving_knowledge(path, chunks, embeddings, metadata):
-    records = []
-    for text, vector in zip(chunks, embeddings):
-        records.append({"text": text, "embeddings": vector.todolist()})
-    data = {"metadata": metadata, "records": records}
 
 #Context
 def search_context(question, amount=5): 
