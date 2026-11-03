@@ -11,6 +11,7 @@ import json
 from pathlib import Path
 import pickle
 import hashlib
+from pypdf import PdfReader
 
 # API KEY
 load_dotenv()
@@ -23,6 +24,7 @@ AI_model = "openai/gpt-oss-120b"
 Temperature = 0.5
 Max_Tokens = 500
 
+
 # Storage paths
 storage = Path(__file__).resolve().parent / "rag_storage"
 storage.mkdir(exist_ok=True)
@@ -32,17 +34,32 @@ embeddings_path = storage / "embeddings.npy"
 index_path = storage / "index.faiss"
 metadata_path = storage / "metadata.json"
 
+
 # AI Persona
 persona = ""
 with open("AI_Persona.txt", "r", encoding="utf-8") as content:
     persona = content.read()
+
+
+#Pdf
+def read_pdf(file_path):
+    reader = PdfReader(file_path)
+    text = ""
+    for page in reader.pages:
+        page_text = page.extract_text()
+
+        if page_text:
+            text += page_text + "\n"
+    
+    return text
+
 
 # File selection
 root = Tk()
 root.withdraw()
 file_path = filedialog.askopenfilename(
     title="Select the file you want to upload.",
-    filetypes=[("Text files", "*.txt")]
+    filetypes=[("Text files", "*.txt"), ("Pdf files", "*.pdf")]
 )
 root.destroy()
 
@@ -50,17 +67,26 @@ if not file_path:
     print("No file selected or found.")
     exit()
 
-with open(file_path, "r", encoding="utf-8") as data:
-    data_base = data.read()
+if file_path.lower().endswith(".txt"):
+    with open(file_path, "r", encoding="utf-8") as data:
+        data_base = data.read()
+elif file_path.lower().endswith(".pdf"):
+    data_base = read_pdf(file_path)
+else:
+    raise ValueError("File type is not supported by this program")
+
 print("Database successfully loaded!")
+
 
 # Document hash
 data_hash = hashlib.sha256(
     data_base.encode("utf-8")
 ).hexdigest()
 
+
 # Embeddings model name
 embeddings_model_name = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+
 
 # Checking storage for information
 def check_storage():
@@ -85,6 +111,7 @@ def check_storage():
 
     return True
 
+
 # Saving the knowledge
 def save_knowledge(chunks, embeddings, index):
 
@@ -108,6 +135,7 @@ def save_knowledge(chunks, embeddings, index):
         json.dump(metadata, file, indent=4)
     print("Knowledge successfully saved!")
 
+
 # Chunks
 def creating_chunks(text, size=1000, overlay=300):
     chunks = []
@@ -121,6 +149,7 @@ def creating_chunks(text, size=1000, overlay=300):
         start += size - overlay
     return chunks
 
+
 # Embeddings
 def creating_embeddings(text_chunks):
     return embeddings_model.encode(
@@ -129,8 +158,10 @@ def creating_embeddings(text_chunks):
         show_progress_bar=False
     )
 
+
 # Embeddings model
 embeddings_model = SentenceTransformer(embeddings_model_name)
+
 
 # Checking storage
 if check_storage():
@@ -158,6 +189,7 @@ else:
 
     save_knowledge(chunks, embeddings, index)
 
+
 # Searching context
 def search_context(question, amount=5):
     embedding_pergunta = embeddings_model.encode(
@@ -174,6 +206,7 @@ def search_context(question, amount=5):
         if 0 <= i < len(chunks):
             results.append(chunks[i])
     return "\n".join(results)
+
 
 # Asking AI
 def ask_AI(question):
@@ -195,21 +228,23 @@ def ask_AI(question):
 # AI speaking
 def AI_speaking(AI_answer):
     ai = pyttsx3.init()
-    ai.setProperty("rate", 180)
+    ai.setProperty("rate", 140) #speed of the speech
     voices = ai.getProperty("voices")
 
     for voice in voices:
         voice_info = f"{voice.name} {voice.id}".lower()
-        if "brazil" in voice_info or "portuguese" in voice_info:
+        #if "brazil" in voice_info or "portuguese" in voice_info:
+            #ai.setProperty("voice", voice.id)
+            #break
+        if "united states of america" in voice_info or "english" in voice_info:
             ai.setProperty("voice", voice.id)
-            break
-
     ai.say(AI_answer)
     ai.runAndWait()
     ai.stop()
 
+
 # Audio test
 print("Initializing audio test.")
-AI_speaking("Fala isso aqui Giu.")
+AI_speaking("Talk to me human")
 print("Audio test finalized.")
 print("Document hash:", data_hash)
