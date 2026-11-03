@@ -8,6 +8,9 @@ import pyttsx3
 from tkinter import Tk, filedialog
 from dotenv import load_dotenv
 import json
+from pathlib import Path
+import pickle
+import hashlib
 
 load_dotenv()
 api_key = os.getenv("API_KEY")
@@ -17,6 +20,12 @@ client = Groq(api_key=api_key)
 AI_model = "openai/gpt-oss-120b"
 Temperature = 0.5
 Max_Tokens = 500
+storage = Path(__file__).resolve().parent / "rag_storage"
+storage.mkdir(exist_ok=True)
+chunks_path = storage / "chunks.pkl"
+embeddings_path = storage / "embeddings.npy"
+index_path = storage / "index.faiss"
+metadata_path = storage / "metadata.json"
 
 #reading AI persona
 persona = ""
@@ -34,6 +43,8 @@ if not file_path:
 with open(file_path, "r", encoding="utf-8") as data:
     data_base = data.read()
 print("Database successfully loaded!")
+data_hash = hashlib.sha256(data_base.encode("utf-8")).hexdigest()
+embeddings_model_name = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 
 
 # Chunks
@@ -100,3 +111,4 @@ def AI_speaking(AI_answer):
 print("Initializing audio test.")
 AI_speaking("Fala isso aqui Giu.")
 print("Audio test finalized.")
+print("Document hash:", data_hash)
