@@ -131,7 +131,7 @@ def check_storage():
 
 
 # Saving the knowledge
-def save_knowledge(chunks, embeddings, index):
+def save_knowledge(chunks, embeddings, index, documents):
 
     # Saving chunks
     with open(chunks_path, "wb") as file:
@@ -145,14 +145,52 @@ def save_knowledge(chunks, embeddings, index):
 
     # Saving metadata
     metadata = {
-        "data_hash": data_hash,
-        "embeddings_model": embeddings_model_name
+        "embeddings_model": embeddings_model_name,
+        "documents": documents
     }
 
     with open(metadata_path, "w", encoding="utf-8") as file:
         json.dump(metadata, file, indent=4)
     print("Knowledge successfully saved!")
 
+def load_knowledge():
+    global chunks, embeddings, index, documents
+    files_exists = (
+        chunks_path.exists() and
+        embeddings_path.exists() and
+        index_path.exists() and
+        metadata_path.exists())
+    
+    if files_exists:
+        with open(metadata_path, "r", encoding="utf-8") as file:
+            metadata = pickle.load(file)
+        embeddings = np.load(embeddings_path)
+        index = faiss.read_index(str(index_path))
+
+        if "documents" in metadata:
+            documents = metadata["documents"]
+        elif "data_hash" in metadata:
+            documents = [{
+                "hash": metadata["dta_hash"],
+                "name": "Previous document"
+            }]
+        else: 
+            raise ValueError("Invalid storage metadata")
+        
+        if index.ntotal != len(chunks):
+            raise ValueError("FAISS index and chunks are inconsistent")
+        if embeddings.shape[0] != len(chunks):
+            raise ValueError("Embeddings and chunks are inconsistent")
+    else:
+        if any(path.exist() for path in [chunks_path, embeddings_path, index_path, metadata_path]):
+            raise ValueError("Storage is incomplete, check rag_storage")
+        print("No existing knowledge found. Creating storage...")
+
+        chunks = []
+        dimension = embeddings_model.get_embedding_dimension()
+        embeddings = np.empty((0, dimension), dtype=("float32"))
+        index = faiss.IndexFlatL2(dimension)
+        documents = []
 
 # Chunks
 def creating_chunks(text, size=1000, overlay=300):
@@ -180,6 +218,8 @@ def creating_embeddings(text_chunks):
 # Embeddings model
 embeddings_model = SentenceTransformer(embeddings_model_name)
 
+# Loading storage
+load_knowledge()
 
 # Checking storage
 if check_storage():
@@ -224,6 +264,9 @@ def search_context(question, amount=5):
         if 0 <= i < len(chunks):
             results.append(chunks[i])
     return "\n".join(results)
+
+def add_new_document():
+    pass
 
 
 #AI Speech Recognition
@@ -314,26 +357,31 @@ def AI_speaking(AI_answer):
 
 def main():
     chat_log = []
+
+    print("\nAI is ready! Start talking.")
+    print("Say 'encerrar conversa' to stop.")
+
     while True:
         question = listening()
         if question is None:
             continue
-        command = question.lower().strip().rstirp(".!?")
-        if command in ["Fechar conversa", "Finalizar processo"]:
+        command = question.lower().strip().rstrip(".!?")
+        if command in ["encerrar conversa", "finalizar processo", "sair", "parar"]:
+            print("Finalizing conversation...")
             break
-
         try:
             answer = ask_AI(question)
+            print("\nAI:", answer)
             AI_speaking(answer)
+
             chat_log.append(f"Você: {question}")
             chat_log.append(f"IA: {answer}")
             chat_log.append("")
         except Exception as e:
-            print(e, "error has occured")
+            print(e, "An error has occurred.")
 
     context_folder = Path("Conversations")
     context_folder.mkdir(exist_ok=True)
-
     file_name = datetime.now().strftime("conversation_%Y-%m-%d_%H-%M-%S.txt")
     file_path = context_folder / file_name
 
@@ -343,9 +391,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-# Audio test
-print("Initializing audio test.")
-AI_speaking("Talk to me human")
-print("Audio test finalized.")
-print("Document hash:", data_hash)
-listening()
