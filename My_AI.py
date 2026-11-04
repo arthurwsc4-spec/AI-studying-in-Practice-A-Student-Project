@@ -12,6 +12,9 @@ from pathlib import Path
 import pickle
 import hashlib
 from pypdf import PdfReader
+from docx import Document
+import sounddevice as sd
+import speech_recognition as sr
 
 # API KEY
 load_dotenv()
@@ -53,13 +56,25 @@ def read_pdf(file_path):
     
     return text
 
+#Word - Docx
+def read_docx(file_path):
+    document = Document(file_path)
+    text = ""
+    for paragraph in document.paragraphs:
+        text += paragraph.text + "\n"
+    
+    return text
+    
 
 # File selection
 root = Tk()
 root.withdraw()
 file_path = filedialog.askopenfilename(
     title="Select the file you want to upload.",
-    filetypes=[("Text files", "*.txt"), ("Pdf files", "*.pdf")]
+    filetypes=[("Suported files", "*.txt *.pdf *.docx"),
+               ("Text files", "*.txt"),
+               ("Pdf files", "*.pdf"),
+               ("Word files", "*.docx")]
 )
 root.destroy()
 
@@ -72,6 +87,8 @@ if file_path.lower().endswith(".txt"):
         data_base = data.read()
 elif file_path.lower().endswith(".pdf"):
     data_base = read_pdf(file_path)
+elif file_path.lower().endswith(".docx"):
+    data_base = read_docx(file_path)
 else:
     raise ValueError("File type is not supported by this program")
 
@@ -207,6 +224,24 @@ def search_context(question, amount=5):
             results.append(chunks[i])
     return "\n".join(results)
 
+
+#AI Speech Recognition
+def listening():
+    recognizer = sr.Recognizer()
+    sample_rate = int(sd.query_devices(kind="input")["default_samplerate"])
+    recognizer.energy_threshold = 300
+    recognizer.dynamic_energy_threshold = True
+    recognizer.pause_threshold = 1.2
+    recognizer.phrase_threshold = 0.3
+    recognizer.non_speaking_duration = 0.5
+
+    recording = sd.rec(int(5 * sample_rate), samplerate=sample_rate, channels=1, dtype="int16")
+    sd.wait()
+
+    audio_calibration = sr.AudioData(recording.tobytes(), sample_rate, 2)
+    
+    recognizer.adjust_for_ambient_noise(sr.AudioData(audio_calibration.frame_data), sample_rate, 2)
+    print("You can say whenever you'd like")
 
 # Asking AI
 def ask_AI(question):
