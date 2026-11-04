@@ -15,6 +15,7 @@ from pypdf import PdfReader
 from docx import Document
 import sounddevice as sd
 import speech_recognition as sr
+from datetime import datetime
 
 # API KEY
 load_dotenv()
@@ -311,7 +312,37 @@ def AI_speaking(AI_answer):
     ai.runAndWait()
     ai.stop()
 
+def main():
+    chat_log = []
+    while True:
+        question = listening()
+        if question is None:
+            continue
+        command = question.lower().strip().rstirp(".!?")
+        if command in ["Fechar conversa", "Finalizar processo"]:
+            break
 
+        try:
+            answer = ask_AI(question)
+            AI_speaking(answer)
+            chat_log.append(f"Você: {question}")
+            chat_log.append(f"IA: {answer}")
+            chat_log.append("")
+        except Exception as e:
+            print(e, "error has occured")
+
+    context_folder = Path("Conversations")
+    context_folder.mkdir(exist_ok=True)
+
+    file_name = datetime.now().strftime("conversation_%Y-%m-%d_%H-%M-%S.txt")
+    file_path = context_folder / file_name
+
+    with open(file_path, "w", encoding="utf-8") as file:
+        file.write("\n".join(chat_log))
+    print(f"\nConversation saved at: {file_path}")
+
+if __name__ == "__main__":
+    main()
 # Audio test
 print("Initializing audio test.")
 AI_speaking("Talk to me human")
