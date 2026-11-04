@@ -1,3 +1,4 @@
+
 import os
 from getpass import getpass
 from sentence_transformers import SentenceTransformer
@@ -45,113 +46,85 @@ with open("AI_Persona.txt", "r", encoding="utf-8") as content:
     persona = content.read()
 
 
-#Pdf
+# PDF
 def read_pdf(file_path):
     reader = PdfReader(file_path)
     text = ""
+
     for page in reader.pages:
         page_text = page.extract_text()
 
         if page_text:
             text += page_text + "\n"
-    
+
     return text
 
-#Word - Docx
+
+# Word - DOCX
 def read_docx(file_path):
     document = Document(file_path)
     text = ""
+
     for paragraph in document.paragraphs:
         text += paragraph.text + "\n"
-    
+
     return text
-    
+
 
 # File selection
-root = Tk()
-root.withdraw()
-file_path = filedialog.askopenfilename(
-    title="Select the file you want to upload.",
-    filetypes=[("Suported files", "*.txt *.pdf *.docx"),
-               ("Text files", "*.txt"),
-               ("Pdf files", "*.pdf"),
-               ("Word files", "*.docx")]
-)
-root.destroy()
+def select_document():
+    root = Tk()
+    root.withdraw()
 
-if not file_path:
-    print("No file selected or found.")
-    exit()
-
-if file_path.lower().endswith(".txt"):
-    with open(file_path, "r", encoding="utf-8") as data:
-        data_base = data.read()
-elif file_path.lower().endswith(".pdf"):
-    data_base = read_pdf(file_path)
-elif file_path.lower().endswith(".docx"):
-    data_base = read_docx(file_path)
-else:
-    raise ValueError("File type is not supported by this program")
-
-print("Database successfully loaded!")
+    file_path = filedialog.askopenfilename(
+        title="Select a document",
+        filetypes=[
+            ("Supported files", "*.txt *.pdf *.docx"),
+            ("Text files", "*.txt"),
+            ("PDF files", "*.pdf"),
+            ("Word files", "*.docx")
+        ]
+    )
+    root.destroy()
+    return file_path
 
 
-# Document hash
-data_hash = hashlib.sha256(
-    data_base.encode("utf-8")
-).hexdigest()
+# Reading documents
+def read_document(file_path):
+    if file_path.lower().endswith(".txt"):
+        with open(file_path, "r", encoding="utf-8") as file:
+            return file.read()
+    elif file_path.lower().endswith(".pdf"):
+        return read_pdf(file_path)
+    elif file_path.lower().endswith(".docx"):
+        return read_docx(file_path)
+    else:
+        raise ValueError("File type is not supported.")
 
 
 # Embeddings model name
 embeddings_model_name = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 
 
-# Checking storage for information
-def check_storage():
-    files_exist = (
-        chunks_path.exists() and
-        embeddings_path.exists() and
-        index_path.exists() and
-        metadata_path.exists()
-    )
-
-    if not files_exist:
-        return False
-
-    with open(metadata_path, "r", encoding="utf-8") as file:
-        metadata = json.load(file)
-
-    if metadata["data_hash"] != data_hash:
-        return False
-
-    if metadata["embeddings_model"] != embeddings_model_name:
-        return False
-
-    return True
-
-
 # Saving the knowledge
 def save_knowledge(chunks, embeddings, index, documents):
-
     # Saving chunks
     with open(chunks_path, "wb") as file:
         pickle.dump(chunks, file)
-
     # Saving embeddings
     np.save(embeddings_path, embeddings)
-
     # Saving FAISS index
     faiss.write_index(index, str(index_path))
-
     # Saving metadata
     metadata = {
         "embeddings_model": embeddings_model_name,
         "documents": documents
     }
-
     with open(metadata_path, "w", encoding="utf-8") as file:
         json.dump(metadata, file, indent=4)
+
     print("Knowledge successfully saved!")
+
 
 def load_knowledge():
     global chunks, embeddings, index, documents
@@ -160,13 +133,12 @@ def load_knowledge():
         embeddings_path.exists() and
         index_path.exists() and
         metadata_path.exists())
-    
+
     if files_exists:
         with open(metadata_path, "r", encoding="utf-8") as file:
             metadata = pickle.load(file)
         embeddings = np.load(embeddings_path)
         index = faiss.read_index(str(index_path))
-
         if "documents" in metadata:
             documents = metadata["documents"]
         elif "data_hash" in metadata:
@@ -174,9 +146,8 @@ def load_knowledge():
                 "hash": metadata["dta_hash"],
                 "name": "Previous document"
             }]
-        else: 
+        else:
             raise ValueError("Invalid storage metadata")
-        
         if index.ntotal != len(chunks):
             raise ValueError("FAISS index and chunks are inconsistent")
         if embeddings.shape[0] != len(chunks):
@@ -184,6 +155,7 @@ def load_knowledge():
     else:
         if any(path.exist() for path in [chunks_path, embeddings_path, index_path, metadata_path]):
             raise ValueError("Storage is incomplete, check rag_storage")
+        
         print("No existing knowledge found. Creating storage...")
 
         chunks = []
@@ -192,14 +164,15 @@ def load_knowledge():
         index = faiss.IndexFlatL2(dimension)
         documents = []
 
+
 # Chunks
 def creating_chunks(text, size=1000, overlay=300):
     chunks = []
     start = 0
+
     while start < len(text):
         end = start + size
         chunk = text[start:end].strip()
-
         if chunk:
             chunks.append(chunk)
         start += size - overlay
@@ -221,32 +194,6 @@ embeddings_model = SentenceTransformer(embeddings_model_name)
 # Loading storage
 load_knowledge()
 
-# Checking storage
-if check_storage():
-    print("Existing knowledge found! Loading...")
-    # Loading chunks
-    with open(chunks_path, "rb") as file:
-        chunks = pickle.load(file)
-    # Loading embeddings
-    embeddings = np.load(embeddings_path)
-    # Loading FAISS index
-    index = faiss.read_index(str(index_path))
-
-    print("Knowledge successfully loaded!")
-else:
-    print("No compatible storage found. Creating knowledge...")
-    # Chunks
-    chunks = creating_chunks(data_base)
-    # Embeddings
-    embeddings = creating_embeddings(chunks)
-    # FAISS
-    dimension = embeddings.shape[1]
-
-    index = faiss.IndexFlatL2(dimension)
-    index.add(embeddings.astype("float32"))
-
-    save_knowledge(chunks, embeddings, index)
-
 
 # Searching context
 def search_context(question, amount=5):
@@ -254,6 +201,7 @@ def search_context(question, amount=5):
         [question],
         convert_to_numpy=True
     )
+
     distance, indexes = index.search(
         embedding_pergunta.astype("float32"),
         amount
@@ -265,11 +213,16 @@ def search_context(question, amount=5):
             results.append(chunks[i])
     return "\n".join(results)
 
+
 def add_new_document():
-    pass
+    global chunks, embeddings, index, documents
+    file_path = select_document()
+    if not file_path:
+        print("No document selected")
+        return
 
 
-#AI Speech Recognition
+# AI Speech Recognition
 def listening():
     recognizer = sr.Recognizer()
     sample_rate = int(sd.query_devices(kind="input")["default_samplerate"])
@@ -287,7 +240,6 @@ def listening():
                 int(sample_rate * block_duration)
             )
             volume = np.abs(audio_block).mean()
-
             if volume > threshold:
                 speech_detected = True
                 silence_time = 0
@@ -299,27 +251,24 @@ def listening():
                     break
 
     audio_data = np.concatenate(audio_frames)
-
     audio = sr.AudioData(
         audio_data.tobytes(),
         sample_rate,
         2
     )
+
     try:
         text = recognizer.recognize_google(
             audio,
             language="pt-BR"
         )
-
-        print("Você disse:", text)
-
         return text
     except sr.UnknownValueError:
         print("Não consegui entender o áudio.")
     except sr.RequestError as error:
         print("Erro no serviço de reconhecimento:", error)
-
     return None
+
 
 # Asking AI
 def ask_AI(question):
@@ -341,25 +290,24 @@ def ask_AI(question):
 # AI speaking
 def AI_speaking(AI_answer):
     ai = pyttsx3.init()
-    ai.setProperty("rate", 140) #speed of the speech
+    ai.setProperty("rate", 140)  # speed of the speech
     voices = ai.getProperty("voices")
 
     for voice in voices:
         voice_info = f"{voice.name} {voice.id}".lower()
-        #if "brazil" in voice_info or "portuguese" in voice_info:
-            #ai.setProperty("voice", voice.id)
-            #break
+        # if "brazil" in voice_info or "portuguese" in voice_info:
+        #     ai.setProperty("voice", voice.id)
+        #     break
         if "united states of america" in voice_info or "english" in voice_info:
             ai.setProperty("voice", voice.id)
+
     ai.say(AI_answer)
     ai.runAndWait()
     ai.stop()
 
+
 def main():
     chat_log = []
-
-    print("\nAI is ready! Start talking.")
-    print("Say 'encerrar conversa' to stop.")
 
     while True:
         question = listening()
@@ -369,9 +317,12 @@ def main():
         if command in ["encerrar conversa", "finalizar processo", "sair", "parar"]:
             print("Finalizing conversation...")
             break
+
         try:
             answer = ask_AI(question)
+
             print("\nAI:", answer)
+
             AI_speaking(answer)
 
             chat_log.append(f"Você: {question}")
@@ -382,12 +333,15 @@ def main():
 
     context_folder = Path("Conversations")
     context_folder.mkdir(exist_ok=True)
+
     file_name = datetime.now().strftime("conversation_%Y-%m-%d_%H-%M-%S.txt")
     file_path = context_folder / file_name
 
     with open(file_path, "w", encoding="utf-8") as file:
         file.write("\n".join(chat_log))
+
     print(f"\nConversation saved at: {file_path}")
+
 
 if __name__ == "__main__":
     main()
