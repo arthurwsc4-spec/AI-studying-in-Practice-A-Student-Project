@@ -1,4 +1,3 @@
-
 import os
 from getpass import getpass
 from sentence_transformers import SentenceTransformer
@@ -237,16 +236,49 @@ def search_context(question, amount=5):
             results.append(chunks[i])
     return "\n".join(results)
 
-#________________________________________________________________________________________
-#----------------------------------------------------------------------------------------
+
 def add_new_document():  #needs to finish
     global chunks, embeddings, index, documents
     file_path = select_document()
     if not file_path:
         print("No document selected")
         return
-#----------------------------------------------------------------------------------------
-#________________________________________________________________________________________
+
+    data = read_document(file_path)
+
+    if not data.strip():
+        print("Document is empty")
+
+    document_hash = hashlib.sha256(data.encode("utf-8")).hexdigest()
+    for document in documents:
+        if document["hash"] == document_hash:
+            print("This document already exists")
+            return
+
+    new_chunks = creating_chunks(data)
+    if not new_chunks:
+        print("No chunks were created")
+        return
+
+    new_embeddings = creating_embeddings(new_chunks).astype("float32")
+    if new_embeddings.shape[1] != index.d:
+        raise ValueError("Embeddings dimension don't match")
+
+    index.add(new_embeddings)
+
+    embeddings = np.vstack([embeddings, new_embeddings])
+
+    chunks.extend(new_chunks)
+
+    documents.append({
+        "hash": document_hash,
+        "name": Path(file_path).name
+    })
+
+    save_knowledge(chunks, embeddings, index, documents)
+
+    AI_speaking("New document succesfully uploaded")
+
 
 # AI Speech Recognition
 def listening():
