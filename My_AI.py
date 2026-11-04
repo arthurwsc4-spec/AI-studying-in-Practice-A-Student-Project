@@ -132,35 +132,59 @@ def load_knowledge():
         chunks_path.exists() and
         embeddings_path.exists() and
         index_path.exists() and
-        metadata_path.exists())
+        metadata_path.exists()
+    )
 
     if files_exists:
+        # Loading metadata
         with open(metadata_path, "r", encoding="utf-8") as file:
-            metadata = pickle.load(file)
+            metadata = json.load(file)
+
+        # Checking embeddings model
+        if metadata["embeddings_model"] != embeddings_model_name:
+            raise ValueError("Different embeddings model detected.")
+
+        # Loading chunks
+        with open(chunks_path, "rb") as file:
+            chunks = pickle.load(file)
+
+        # Loading embeddings
         embeddings = np.load(embeddings_path)
+
+        # Loading FAISS index
         index = faiss.read_index(str(index_path))
+
+        # Loading documents
         if "documents" in metadata:
             documents = metadata["documents"]
+
         elif "data_hash" in metadata:
             documents = [{
-                "hash": metadata["dta_hash"],
+                "hash": metadata["data_hash"],
                 "name": "Previous document"
             }]
         else:
-            raise ValueError("Invalid storage metadata")
+            raise ValueError("Invalid storage metadata.")
+
+        # Checking consistency
         if index.ntotal != len(chunks):
-            raise ValueError("FAISS index and chunks are inconsistent")
+            raise ValueError("FAISS index and chunks are inconsistent.")
         if embeddings.shape[0] != len(chunks):
-            raise ValueError("Embeddings and chunks are inconsistent")
+            raise ValueError("Embeddings and chunks are inconsistent.")
+        if embeddings.shape[1] != index.d:
+            raise ValueError("Embedding dimensions are inconsistent.")
+        print("Knowledge successfully loaded!")
+
     else:
-        if any(path.exist() for path in [chunks_path, embeddings_path, index_path, metadata_path]):
-            raise ValueError("Storage is incomplete, check rag_storage")
-        
-        print("No existing knowledge found. Creating storage...")
+
+        # Checking incomplete storage
+        if any(path.exists() for path in [chunks_path, embeddings_path, index_path, metadata_path]):
+            raise ValueError("Storage is incomplete. Check rag_storage.")
+        print("No existing knowledge found. Creating empty storage...")
 
         chunks = []
-        dimension = embeddings_model.get_embedding_dimension()
-        embeddings = np.empty((0, dimension), dtype=("float32"))
+        dimension = embeddings_model.get_sentence_embedding_dimension()
+        embeddings = np.empty((0, dimension), dtype="float32")
         index = faiss.IndexFlatL2(dimension)
         documents = []
 
@@ -213,14 +237,16 @@ def search_context(question, amount=5):
             results.append(chunks[i])
     return "\n".join(results)
 
-
-def add_new_document():
+#________________________________________________________________________________________
+#----------------------------------------------------------------------------------------
+def add_new_document():  #needs to finish
     global chunks, embeddings, index, documents
     file_path = select_document()
     if not file_path:
         print("No document selected")
         return
-
+#----------------------------------------------------------------------------------------
+#________________________________________________________________________________________
 
 # AI Speech Recognition
 def listening():
@@ -295,9 +321,9 @@ def AI_speaking(AI_answer):
 
     for voice in voices:
         voice_info = f"{voice.name} {voice.id}".lower()
-        # if "brazil" in voice_info or "portuguese" in voice_info:
-        #     ai.setProperty("voice", voice.id)
-        #     break
+        if "brazil" in voice_info or "portuguese" in voice_info:
+            ai.setProperty("voice", voice.id)
+            break
         if "united states of america" in voice_info or "english" in voice_info:
             ai.setProperty("voice", voice.id)
 
