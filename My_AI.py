@@ -229,19 +229,53 @@ def search_context(question, amount=5):
 def listening():
     recognizer = sr.Recognizer()
     sample_rate = int(sd.query_devices(kind="input")["default_samplerate"])
-    recognizer.energy_threshold = 300
-    recognizer.dynamic_energy_threshold = True
-    recognizer.pause_threshold = 1.2
-    recognizer.phrase_threshold = 0.3
-    recognizer.non_speaking_duration = 0.5
 
-    recording = sd.rec(int(5 * sample_rate), samplerate=sample_rate, channels=1, dtype="int16")
-    sd.wait()
+    silence_limit = 1.5
+    threshold = 500
+    block_duration = 0.1
+    silence_time = 0
+    speech_detected = False
+    audio_frames = []
 
-    audio_calibration = sr.AudioData(recording.tobytes(), sample_rate, 2)
-    
-    recognizer.adjust_for_ambient_noise(sr.AudioData(audio_calibration.frame_data), sample_rate, 2)
-    print("You can say whenever you'd like")
+    with sd.InputStream(samplerate=sample_rate, channels=1, dtype="int16") as stream:
+        while True:
+            audio_block, overflowed = stream.read(
+                int(sample_rate * block_duration)
+            )
+            volume = np.abs(audio_block).mean()
+
+            if volume > threshold:
+                speech_detected = True
+                silence_time = 0
+                audio_frames.append(audio_block.copy())
+            elif speech_detected:
+                audio_frames.append(audio_block.copy())
+                silence_time += block_duration
+                if silence_time >= silence_limit:
+                    break
+
+    audio_data = np.concatenate(audio_frames)
+
+    audio = sr.AudioData(
+        audio_data.tobytes(),
+        sample_rate,
+        2
+    )
+    try:
+        text = recognizer.recognize_google(
+            audio,
+            language="pt-BR"
+        )
+
+        print("Você disse:", text)
+
+        return text
+    except sr.UnknownValueError:
+        print("Não consegui entender o áudio.")
+    except sr.RequestError as error:
+        print("Erro no serviço de reconhecimento:", error)
+
+    return None
 
 # Asking AI
 def ask_AI(question):
@@ -283,3 +317,4 @@ print("Initializing audio test.")
 AI_speaking("Talk to me human")
 print("Audio test finalized.")
 print("Document hash:", data_hash)
+listening()
