@@ -220,6 +220,8 @@ load_knowledge()
 
 # Searching context
 def search_context(question, amount=5):
+    if index.ntotal == 0:
+        return ""
     embedding_pergunta = embeddings_model.encode(
         [question],
         convert_to_numpy=True
@@ -375,6 +377,11 @@ def main():
         if command in ["encerrar conversa", "finalizar processo", "sair", "parar"]:
             print("Finalizing conversation...")
             break
+        if command in ["adicionar arquivos", "adicionar documentos"]:
+            try:
+                add_new_document()
+            except Exception as e:
+                print(f"Some error occured when trying to upload the new document. Error: {e}")
 
         try:
             answer = ask_AI(question)
