@@ -16,6 +16,7 @@ from docx import Document
 import sounddevice as sd
 import speech_recognition as sr
 from datetime import datetime
+import re
 
 # API KEY
 load_dotenv()
@@ -346,6 +347,13 @@ def ask_AI(question):
     )
     return response.choices[0].message.content
 
+#Remove any characters on the answer
+def remove_markdown(text):
+    text = re.sub(r"^#{1,6}\s*", "", text, flags=re.MULTILINE)
+    text = re.sub(r"\*{1,3}(.*?)\*{1,3}", r"\1", text)
+    text = re.sub(r"_{1,3}(.*?)_{1,3}", r"\1", text)
+    text = re.sub(r"`+", "", text)
+    return text.strip()
 
 # AI speaking
 def AI_speaking(AI_answer):
@@ -361,7 +369,7 @@ def AI_speaking(AI_answer):
         if "united states of america" in voice_info or "english" in voice_info:
             ai.setProperty("voice", voice.id)
 
-    ai.say(AI_answer)
+    ai.say(remove_markdown(AI_answer))
     ai.runAndWait()
     ai.stop()
 
@@ -370,13 +378,14 @@ def main():
     chat_log = []
 
     AI_speaking("""Olá! Sou o assistente virtual especializado no curso de Inteligência Artificial do Ensino Médio.
-                    Eu fui criada por um aluno do 2 ano do curso de IA que se chama Arthur Wendler. 
+                    Eu fui criada por um aluno do segundo ano do curso de IA que se chama Arthur Wendler. 
                     Eu posso apresentar o curso, explicar os conteúdos estudados, esclarecer dúvidas sobre tecnologias como 
                     Machine Learning, LLMs, Embeddings e RAG, além de ajudar você a compreender como a Inteligência 
                     Artificial funciona. O que gostaria de saber?""") #introduction
     
     while True:
         question = listening()
+        question = question.strip().replace("*", " ").replace("#", " ")
         if question is None:
             continue
         command = question.lower().strip().rstrip(".!?")
