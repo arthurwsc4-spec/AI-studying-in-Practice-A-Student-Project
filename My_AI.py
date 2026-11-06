@@ -26,7 +26,7 @@ client = Groq(api_key=api_key)
 
 AI_model = "openai/gpt-oss-120b"
 Temperature = 0.5
-Max_Tokens = 500
+Max_Tokens = 300
 
 
 # Storage paths
@@ -350,7 +350,7 @@ def ask_AI(question):
 # AI speaking
 def AI_speaking(AI_answer):
     ai = pyttsx3.init()
-    ai.setProperty("rate", 140)  # speed of the speech
+    ai.setProperty("rate", 240)  # speed of the speech
     voices = ai.getProperty("voices")
 
     for voice in voices:
@@ -369,6 +369,12 @@ def AI_speaking(AI_answer):
 def main():
     chat_log = []
 
+    AI_speaking("""Olá! Sou o assistente virtual especializado no curso de Inteligência Artificial do Ensino Médio.
+                    Eu fui criada por um aluno do 2 ano do curso de IA que se chama Arthur Wendler. 
+                    Eu posso apresentar o curso, explicar os conteúdos estudados, esclarecer dúvidas sobre tecnologias como 
+                    Machine Learning, LLMs, Embeddings e RAG, além de ajudar você a compreender como a Inteligência 
+                    Artificial funciona. O que gostaria de saber?""") #introduction
+    
     while True:
         question = listening()
         if question is None:
@@ -384,9 +390,10 @@ def main():
                 print(f"Some error occured when trying to upload the new document. Error: {e}")
 
         try:
+            print(question)
             answer = ask_AI(question)
 
-            print("\nAI:", answer)
+            print("\n\nAI:", answer)
 
             AI_speaking(answer)
 
